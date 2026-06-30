@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+
+from scapy.all import sniff, IP, TCP, UDP, ICMP, Raw
+
+def packet_info(packet):
+
+    print("\n" + "="*50)
+
+    if packet.haslayer(IP):
+        print("Source IP :", packet[IP].src)
+        print("Destination IP :", packet[IP].dst)
+
+        if packet.haslayer(TCP):
+            print("Protocol : TCP")
+
+        elif packet.haslayer(UDP):
+            print("Protocol : UDP")
+
+        elif packet.haslayer(ICMP):
+            print("Protocol : ICMP")
+
+        else:
+            print("Protocol : Other")
+
+    if packet.haslayer(Raw):
+        try:
+            payload = packet[Raw].load.decode(errors="ignore")
+            print("Payload :", payload[:100])
+        except:
+            print("Payload : Binary Data")
+
+    print("="*50)
+
+print("Basic Network Sniffer Started...")
+print("Capturing 10 packets...")
+print("Press Ctrl+K to stop.\n")
+
+sniff(
+    prn=packet_info,
+    count=10,
+    store=False
+)
+
+print("\nPacket Capture Completed.")
