@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Secrets
+.env
+
+# Generated data and database
+data/alerts.db
+data/raw/
+data/processed/
+runs/
+
+# Editor and OS files
+.vscode/
+.DS_Store
+
