@@ -91,49 +91,63 @@ Network Traffic / Zeek Logs
 ## 📁 Project Structure
 
 ```text
-llm-alert-triage/
+CyberSage/
 ├── backend/
 │   ├── __init__.py
-│   ├── database.py
-│   └── main.py
+│   ├── database.py             # SQLite alert storage with lifecycle & note tracking
+│   └── main.py                 # FastAPI REST API (CRUD, triage, analytics, metrics)
 ├── detectors/
 │   ├── __init__.py
-│   └── port_scan.py
+│   ├── registry.py             # Pluggable detector runner and registry
+│   ├── port_scan.py            # Vertical port scans & horizontal subnet sweeps
+│   ├── brute_force.py          # Authentication brute-force on SSH, RDP, FTP, Telnet
+│   ├── suspicious_outbound.py  # C2, Tor, Miner, and high-risk port connections
+│   ├── data_exfiltration.py    # Large volume outbound transfers & upload asymmetry
+│   └── dns_tunneling.py        # Oversized DNS payloads & rapid query burst rates
+├── ml/
+│   ├── __init__.py
+│   ├── feature_extractor.py    # Network flow feature extraction & normalization
+│   └── anomaly_detector.py     # Unsupervised Isolation Forest outlier detector
+├── threat_intel/
+│   ├── __init__.py
+│   └── enricher.py             # RFC 1918 classification & public IP threat reputation
 ├── pipeline/
-│   └── normalizer.py
+│   ├── __init__.py
+│   └── normalizer.py           # Zeek conn.log parser and event normalizer
 ├── triage/
 │   ├── __init__.py
-│   ├── schemas.py
-│   ├── llm_client.py
-│   └── real_llm_client.py
+│   ├── schemas.py              # Pydantic TriageResult schema (evidence, actions, MITRE)
+│   ├── dispatcher.py           # Auto-router between OpenAI and mock triage
+│   ├── llm_client.py           # Comprehensive defensive mock triage generator
+│   └── real_llm_client.py      # OpenAI client with prompt hardening & schema validation
 ├── tests/
-│   ├── create_sample_traffic.py
-│   ├── test_database.py
-│   ├── test_port_scan.py
-│   ├── test_real_llm_client.py
-│   └── test_triage.py
-├── data/
-│   ├── raw/
-│   └── processed/
-├── dashboard.py
-├── run_pipeline.py
-├── requirements.txt
-├── .env
-├── .gitignore
-└── README.md
+│   ├── create_sample_traffic.py# Synthetic multi-vector Zeek conn.log generator
+│   ├── test_api.py             # FastAPI integration tests
+│   ├── test_database.py        # SQLite persistence and note tracking tests
+│   ├── test_detectors.py       # Rule-based detector unit tests
+│   ├── test_ml_anomaly.py      # Isolation Forest anomaly scoring tests
+│   ├── test_port_scan.py       # Port scan detector tests
+│   ├── test_real_llm_client.py # Mocked OpenAI client tests
+│   ├── test_threat_intel.py    # RFC 1918 protection and TI lookup tests
+│   └── test_triage.py          # Structured triage validation tests
+├── dashboard.py                # Streamlit SOC Dashboard (Queue, Timeline, Graph)
+├── run_pipeline.py             # End-to-end pipeline runner (Normalize -> Detect -> ML -> TI -> DB)
+├── requirements.txt            # Python dependencies
+├── .env.example                # Configuration template
+├── .gitignore                  # Git exclusions
+└── README.md                   # Project documentation
 ```
 
 ## ⚙️ Installation and Setup
 
 ### Prerequisites
 
-Install or prepare the following:
-
-- Kali Linux or a compatible Linux environment
-- Python 3 and `venv`
+- Python 3.10+ (tested on Python 3.10–3.14 on Linux, macOS, and Windows)
 - Git
-- Docker, if you want to run Zeek using its Docker image
-- An API key from a compatible LLM provider for real LLM-based triage
+- Virtual environment (`venv`)
+- *(Optional)* OpenAI API key if testing live LLM triage (the system includes an automated mock triage fallback if unconfigured)
+
+---
 
 ### 1. Clone the repository
 
@@ -142,20 +156,79 @@ git clone https://github.com/17agl/CyberSage.git
 cd CyberSage
 ```
 
-### 2. Create a virtual environment
+### 2. Create and activate a virtual environment
 
+**On Linux / macOS:**
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-If creating the virtual environment fails because `venv` is unavailable on Kali Linux, install the required package:
-
-```bash
-sudo apt update
-sudo apt install -y python3-venv
+**On Windows (PowerShell):**
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-Then create and activate the environment again.
+### 3. Install dependencies
 
-### 
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure environment variables (Optional)
+
+Copy the configuration template:
+```bash
+cp .env.example .env
+```
+*(On Windows: `copy .env.example .env`)*
+
+Edit `.env` if you have an OpenAI API key:
+```env
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4.1-mini
+CYBERSAGE_TRIAGE_MODE=auto
+```
+> **Note:** If `OPENAI_API_KEY` is not provided or remains default, CyberSage automatically runs in high-fidelity mock triage mode so all features work seamlessly offline without API costs!
+
+---
+
+## 🚀 Running CyberSage
+
+### Step 1: Generate Traffic & Run the Detection Pipeline
+
+Run the end-to-end pipeline. If no Zeek logs exist, it automatically creates a multi-vector synthetic dataset (`data/processed/conn.log`), normalizes it, runs all detection rules, trains the Isolation Forest ML model, enriches with Threat Intelligence, and stores alerts in SQLite:
+
+```bash
+python run_pipeline.py
+```
+
+### Step 2: Start the FastAPI Backend
+
+In your first terminal, launch the backend API:
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+- Interactive API Documentation: **http://127.0.0.1:8000/docs**
+- Health Check: **http://127.0.0.1:8000/health**
+
+### Step 3: Launch the Streamlit SOC Dashboard
+
+In a second terminal (with your virtual environment activated), start the dashboard:
+
+```bash
+streamlit run dashboard.py
+```
+- Open your browser to: **http://localhost:8501**
+
+---
+
+## 🧪 Running Automated Tests
+
+Run the full pytest suite (25 automated tests):
+
+```bash
+pytest tests/ -v
+```
